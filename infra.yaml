@@ -1,0 +1,291 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "This is a solution to all challenges in the IAC module in the udacity course"
+
+Parameters: 
+  Net:
+    Description: Name for output exports
+    Type: String 
+    Default: UdacityProject
+  udagramAMI:
+    Description: AMI Id of Instance
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: '/aws/service/canonical/ubuntu/server/22.04/stable/20220420/amd64/hvm/ebs-gp2/ami-id'
+  ec2InstanceType:
+    Type: String
+    Default: t2.medium
+    AllowedValues:
+    - t2.medium
+    - t3.medium
+  ASGname:
+    Type: String
+    Default: udagramASG
+  BucketName: 
+    Type: String
+    Default: myproject2022
+  bastionInstance:
+    Type: String
+    Default: t2.micro
+  bastionAMI: 
+    Type: String
+    Default: ami-0022f774911c1d690
+  udaKey:
+    Type: String
+    Default: uda_rsa
+
+Resources: 
+# Security Group for Private Subnet and everything needed by instances in Private Subnet
+  udagramSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: "Allows only inbound access on port 80"
+      GroupName: AutoScalingSG
+      VpcId: 
+        Fn::ImportValue:
+          !Sub ${Net}-VPCID
+      SecurityGroupEgress: 
+      - IpProtocol: tcp
+        FromPort: 0
+        ToPort: 65535
+        CidrIp: 0.0.0.0/0
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        SourceSecurityGroupId: !Ref udagramLBSecurityGrp
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        SourceSecurityGroupId: pwd
+  udagramRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: "This role is assumed by the ec2 to access s3" 
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+        - Effect: "Allow"
+          Principal: 
+            Service:
+            - ec2.amazonaws.com
+          Action: 
+          - 'sts:AssumeRole'
+      ManagedPolicyArns: 
+      - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+  udagramProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: 
+      - !Ref udagramRole
+  udagramASConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties: 
+      AssociatePublicIpAddress: True 
+      IamInstanceProfile: !Ref udagramProfile
+      ImageId: !Ref udagramAMI
+      BlockDeviceMappings: 
+        - DeviceName: /dev/sda1
+          Ebs: 
+            VolumeSize: '15'
+            VolumeType: gp2
+      InstanceType: !Ref ec2InstanceType
+      SecurityGroups:
+      - !Ref udagramSG
+      UserData:
+        Fn::Base64: !Sub |
+         #!/bin/bash
+         sudo apt update -y
+         sudo apt install apache2 unzip -y 
+         sudo systemctl start apache2.service       
+         curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+         unzip awscliv2.zip 
+         sudo ./aws/install
+         cd /var/www/html  
+         aws s3 cp s3://udacity-demo-1/udacity.zip .
+         unzip -o udacity.zip
+         EC2_AVAIL_ZONE=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
+         echo "<h1>Hello World From $(hostname -f) in AZ $EC2_AVAIL_ZONE </h1>" >> index.html
+
+         
+        #  For quick test, replace lines 91-93 with this command <<echo "Your Cloud Formation Script Works!!" > index.html>>  
+         
+        
+  udagramASG: 
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties: 
+      Cooldown: "300"
+      DesiredCapacity: "3"
+      VPCZoneIdentifier:
+      - Fn::ImportValue: 
+          !Sub "${Net}-privSubnet1" 
+      - Fn::ImportValue: 
+          !Sub "${Net}-privSubnet2"
+      LaunchConfigurationName: !Ref udagramASConfig
+      TargetGroupARNs: 
+      - !Ref LbTargetG
+      MaxSize: "4"
+      MinSize: "2"
+  udagramASGPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref udagramASG
+      PolicyType: SimpleScaling
+      AdjustmentType: ChangeInCapacity
+      ScalingAdjustment: 1
+# ---------------------------LOAD BALANCER------------------------------#
+# All resource config for load balancer to function
+  udagramLBSecurityGrp:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: "Allows only inbound access to load balancer"
+      GroupName: LoadBalancerSG
+      VpcId: 
+        Fn::ImportValue:
+          !Sub ${Net}-VPCID
+      SecurityGroupIngress: 
+        IpProtocol: tcp 
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+         IpProtocol: tcp
+         FromPort: 80
+         ToPort: 80
+         CidrIp: 0.0.0.0/0
+  udagramLB: 
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties: 
+      SecurityGroups: 
+      - !Ref udagramSG
+      Subnets:
+      - Fn::ImportValue: 
+          !Sub "${Net}-pubSubnet1" 
+      - Fn::ImportValue: 
+          !Sub "${Net}-pubSubnet2"      
+  LbListeners:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions: 
+      - Type: forward
+        TargetGroupArn: !Ref LbTargetG 
+      LoadBalancerArn: !Ref udagramLB
+      Port: '80'
+      Protocol: HTTP
+  LbTargetG:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:   
+      HealthCheckEnabled: True 
+      HealthCheckIntervalSeconds: 20
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Port: "80"
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      VpcId:  
+        Fn::ImportValue:
+          !Sub ${Net}-VPCID
+  LbListenersRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions: 
+      - Type: forward
+        TargetGroupArn: !Ref LbTargetG
+      Conditions:
+        - Field: path-pattern
+          Values: [/]
+      ListenerArn: !Ref LbListeners
+      Priority: 1
+# ---------------------------------BASTION HOST--------------------------------#
+  bastionSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: "Allows only ssh into bastion"
+      GroupName: bastionSG
+      VpcId: 
+        Fn::ImportValue:
+          !Sub ${Net}-VPCID
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 0.0.0.0/0
+  bastionEIP:  
+    Type: AWS::EC2::EIP 
+    Properties: 
+      InstanceId: !Ref bastionHost
+      Tags:
+      - Key: type
+        Value: public
+  bastionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: "This role is assumed by the ec2 to access s3" 
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+        - Effect: "Allow"
+          Principal: 
+            Service:
+            - ec2.amazonaws.com
+          Action: 
+          - 'sts:AssumeRole'
+      ManagedPolicyArns: 
+      - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
+  bastionInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref bastionRole
+  bastionHost:    
+    Type: AWS::EC2::Instance
+    Properties: 
+     InstanceType: !Ref bastionInstance
+     ImageId: !Ref bastionAMI
+     NetworkInterfaces:
+     - AssociatePublicIpAddress: True
+       DeviceIndex: "0"
+       GroupSet: 
+       - !Ref bastionSG
+       SubnetId: 
+        Fn::ImportValue: 
+         !Sub "${Net}-pubSubnet1"
+     KeyName: !Ref udaKey 
+     UserData:
+       !Base64 |
+        #!/bin/bash -ex
+        apt-get update -y
+        apt-get upgrade -y
+# ------------S3 BUCKET----------------#
+# Config for S3 bucket. This will create an s3 bucket for you. I didn't use it in my ASG.
+  # udagramBucket:
+  #   Type: "AWS::S3::Bucket"
+  #   Properties:
+  #     AccessControl: PublicRead
+  #     BucketName: !Ref BucketName
+  # udaBucketPolicy:
+  #   Type: "AWS::S3::BucketPolicy"
+  #   Properties:
+  #     Bucket: !Ref BucketName 
+  #     PolicyDocument: 
+  #       Version: "2012-10-17"
+  #       Statement: 
+  #        - Action: "S3:GetObject"
+  #          Effect: "Allow"
+  #          Principal: "*"
+  #          Resource: 
+  #           - !Join ["", ['arn:aws:s3:::', !Ref BucketName, /*]]
+    
+# -----------------------------------------OUTPUTS-----------------------------------------#
+Outputs:
+  URL:
+    Description: "The website;s URL"
+    Value: !Join ["", ['http://', !GetAtt udagramLB.DNSName]] 
+    Export:
+      Name: !Sub ${Net}-Url
+  bastionIP: 
+    Description: "The bastion host EIP address"
+    Value: !Ref bastionEIP
+      
+

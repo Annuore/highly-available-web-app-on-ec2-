@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "This is a solution to all challenges in the IAC module in the udacity course"
+
+Parameters: 
+  Net:
+    Description: Name for output exports
+    Type: String 
+    Default: UdacityProject
+  EC2:
+    Description: AMI Id of Instance
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+  ec2InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues:
+    - t2.micro
+    - t3.micro
+    
+
+Resources:
+  serverRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+        - Effect: Allow
+          Principal: 
+            Service:
+            - ec2.amazonaws.com
+          Action: 
+          - 'sts:AssumeRole'
+      ManagedPolicyArns: 
+      - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+  serverProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: 
+      - !Ref serverRole
+  serverSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: "Allows only inbound access"
+      GroupName: webaccessSG
+      VpcId: 
+        Fn::ImportValue:
+          !Sub ${Net}-VPCID
+      SecurityGroupEgress: 
+        IpProtocol: -1
+        FromPort: -1
+        ToPort: -1
+        CidrIp: 0.0.0.0/0
+      SecurityGroupIngress:
+         IpProtocol: tcp
+         FromPort: 80
+         ToPort: 80
+         CidrIp: 0.0.0.0/0
+  myInstance: 
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref EC2 
+      InstanceType: !Ref ec2InstanceType
+      NetworkInterfaces:
+      - AssociatePublicIpAddress: True
+        DeviceIndex: "0"
+        GroupSet: 
+        - !Ref serverSG
+        SubnetId: 
+          Fn::ImportValue:
+            !Sub "${Net}-privSubnet"
+       
+
+
+    
+    
+
+  

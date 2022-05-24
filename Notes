@@ -1,0 +1,22 @@
+The namespace is made up of two parts:
+
+Parameter Store Prefix (tree): /aws/service/ami-amazon-linux-latest/
+AMI name alias: (example) amzn-ami-hvm-x86_64-gp2
+
+Run 
+$ aws ssm get-parameters-by-path \
+ --path /aws/service/ami-amazon-linux-latest \
+ --query 'Parameters[].Name'
+to query an instance
+
+For example, you can reference latest AMI IDs published by Canonical using path:
+
+$ aws ssm get-parameters-by-path --path /aws/service/canonical/ubuntu/server/22.04/stable/20220420/ --recursive --query 'Parameters[].Name'
+
+he command returns information like the following.
+
+[
+“/aws/service/canonical/ubuntu/server-minimal/16.04/meta/end-of-extended-security-maintenance-date”,
+“/aws/service/canonical/ubuntu/server-minimal/16.04/meta/end-of-extended security-maintenance-date”,
+“/aws/service/canonical/ubuntu/server/18.04/stable/current/amd64/hvm/ebs-gp2/ami-id”,
+]

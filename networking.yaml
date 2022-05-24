@@ -1,0 +1,114 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "This is a solution to all challenges in the IAC module in the udacity course"
+
+Parameters: 
+  vpcCidr:
+    Type: String 
+    Default: "10.0.0.0/16"
+  pubCidr:
+    Type: String 
+    Default: "10.0.1.0/24"
+  privCidr:
+    Type: String 
+    Default: "10.0.2.0/24"
+  Net:
+    Description: Name for output exports
+    Type: String 
+    Default: UdacityProject
+
+Resources:
+  myVPC:
+    Type: AWS::EC2::VPC
+    Properties: 
+      CidrBlock: !Ref vpcCidr
+  myIG: 
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Stack 
+        Value: test
+  myvpcGW:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref myIG 
+      VpcId: !Ref myVPC
+
+  pubSubnet:
+    Type: AWS::EC2::Subnet 
+    Properties: 
+      CidrBlock: !Ref pubCidr
+      VpcId: !Ref myVPC
+      AvailabilityZone: "us-east-1a" 
+      MapPublicIpOnLaunch: True 
+  pubEIP:  
+    Type: AWS::EC2::EIP 
+    Properties: 
+      Tags:
+      - Key: type
+        Value: public
+  privSubnet:
+    Type: AWS::EC2::Subnet 
+    Properties: 
+      CidrBlock: !Ref privCidr
+      VpcId: !Ref myVPC
+      AvailabilityZone: "us-east-1a"
+  myNAT:
+    Type: AWS::EC2::NatGateway
+    Properties:  
+      AllocationId: !GetAtt pubEIP.AllocationId
+      SubnetId: !Ref pubSubnet
+
+  pubRT:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref myVPC
+  privRT:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref myVPC
+  pubRoute:
+    Type: AWS::EC2::Route 
+    Properties: 
+      RouteTableId: !Ref pubRT
+      GatewayId: !GetAtt  myIG.InternetGatewayId
+      DestinationCidrBlock: "0.0.0.0/0"       
+  priRoute:
+    Type: AWS::EC2::Route 
+    Properties:
+      RouteTableId: !Ref privRT
+      DestinationCidrBlock: "10.0.2.0/24"
+      NatGatewayId: !Ref myNAT 
+      
+
+  pubSubRTA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref pubRT 
+      SubnetId: !Ref pubSubnet
+  privSubRTA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref privRT 
+      SubnetId: !Ref privSubnet
+
+Outputs:
+  VpcId: 
+    Description: The ID of myVPC
+    Value: !Ref myVPC
+    Export:
+      Name: !Sub ${Net}-VPCID
+  ElasticIP:
+    Description: The Ip address of EIP
+    Value: !Ref pubEIP 
+    Export:
+      Name: !Sub "${Net}-IPv4"
+  PrivSubnetId:
+    Description: The Id of my private subnet
+    Value: !Ref privSubnet
+    Export:
+      Name: !Sub "${Net}-privSubnet" 
+  PubSubnetId:
+    Description: The Id of my public subnet
+    Value: !Ref pubSubnet
+    Export: 
+      Name: !Sub "${Net}-pubSubnet"  
