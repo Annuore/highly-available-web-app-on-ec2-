@@ -12,7 +12,9 @@ You will find starter code for the project in this [Github repository](https://g
 * Apache
 * HTML, JS, CSS
 <br>
+
 ## Summary
+
 <br>
 
 # Content
@@ -40,6 +42,7 @@ You have been tasked with provisioning the required infrastructure and deploying
 - Develop for Apple platforms, etc.
 
 **AWS Cloudformation:** AWS CloudFormation is a service that helps you model and set up your AWS resources so that you can spend less time managing those resources and more time focusing on your applications that run in AWS. You create a template that describes all the AWS resources that you want (like Amazon EC2 instances or Amazon RDS DB instances), and CloudFormation takes care of provisioning and configuring those resources for you.
+
 <br>
 
 # Project Requirements <a id='pr'></a>
@@ -62,9 +65,10 @@ You have been tasked with provisioning the required infrastructure and deploying
 - Run `aws configure` to set up your CLI
 - Deploy this [CloudFormation template](./cfn_template/nested_stack.yaml) to AWS and save the outputs asn env variables. You can use the provided [`create-stack`](./scripts/create.sh) script
 
-  export STACK_NAME=webapp
+  
   ```
-
+ export STACK_NAME=webapp
+  ```
   ```
   aws cloudformation create-stack \
   --stack-name $STACK_NAME \
@@ -84,19 +88,19 @@ You have been tasked with provisioning the required infrastructure and deploying
   ```
 
   ```
-  export BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[*].Outputs[0].OutputValue" --output text)
+  export BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[*].Outputs[0].OutputValue" --output text
   ```
 
   ```
-  export CDN_ID=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[*].Outputs[1].OutputValue" --output text)
+  export CDN_ID=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[*].Outputs[1].OutputValue" --output text
   ```
 
   ```
-  export BUCKET_URL=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[*].Outputs[2].OutputValue" --output text)
+  export BUCKET_URL=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[*].Outputs[2].OutputValue" --output text
   ```
 
   ```
-  export CDN_DOMAIN=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[*].Outputs[3].OutputValue" --output text)
+  export CDN_DOMAIN=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[*].Outputs[3].OutputValue" --output text
   ```
 
 - Access the site via the cloudfromation URL under `Outputs`
