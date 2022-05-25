@@ -33,10 +33,12 @@ You have been tasked with provisioning the required infrastructure and deploying
 <br>
 
 # Insight <a id='ins'></a>
+
 **Amazon EC2:**Amazon Elastic Compute Cloud (Amazon EC2) offers the broadest and deepest compute platform, with over 500 instances and choice of the latest processor, storage, networking, operating system, and purchase model to help you best match the needs of your workload. Use cases includes
 - Run cloud-native and enterprise apps
 - Scale for HPC apps
 - Develop for Apple platforms, etc.
+
 **AWS Cloudformation:**AWS CloudFormation is a service that helps you model and set up your AWS resources so that you can spend less time managing those resources and more time focusing on your applications that run in AWS. You create a template that describes all the AWS resources that you want (like Amazon EC2 instances or Amazon RDS DB instances), and CloudFormation takes care of provisioning and configuring those resources for you.
 <br>
 
