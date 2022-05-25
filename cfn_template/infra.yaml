@@ -30,7 +30,7 @@ Parameters:
     Default: ami-0022f774911c1d690
   udaKey:
     Type: String
-    Default: uda_rsa
+    Default: test
 
 Resources: 
 # Security Group for Private Subnet and everything needed by instances in Private Subnet
@@ -55,7 +55,7 @@ Resources:
       - IpProtocol: tcp
         FromPort: 22
         ToPort: 22
-        SourceSecurityGroupId: pwd
+        SourceSecurityGroupId: !Ref bastionSG
   udagramRole:
     Type: AWS::IAM::Role
     Properties:
@@ -155,7 +155,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties: 
       SecurityGroups: 
-      - !Ref udagramSG
+      - !Ref udagramLBSecurityGrp
       Subnets:
       - Fn::ImportValue: 
           !Sub "${Net}-pubSubnet1" 
@@ -280,7 +280,7 @@ Resources:
 # -----------------------------------------OUTPUTS-----------------------------------------#
 Outputs:
   URL:
-    Description: "The website;s URL"
+    Description: "The website's URL"
     Value: !Join ["", ['http://', !GetAtt udagramLB.DNSName]] 
     Export:
       Name: !Sub ${Net}-Url

@@ -1,0 +1,434 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "This is a Webapp Project"
+
+Parameters: 
+  vpcCidr:
+    Type: String 
+    Default: "10.0.0.0/16"
+  pubCidr1:
+    Type: String 
+    Default: "10.0.1.0/24"
+  pubCidr2:
+    Type: String 
+    Default: "10.0.2.0/24"
+  privCidr1:
+    Type: String 
+    Default: "10.0.3.0/24"
+  privCidr2:
+    Type: String 
+    Default: "10.0.4.0/24"
+  Net:
+    Description: Name for output exports
+    Type: String 
+    Default: UdacityProject
+  udagramAMI:
+    Description: AMI Id of Instance
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: '/aws/service/canonical/ubuntu/server/22.04/stable/20220420/amd64/hvm/ebs-gp2/ami-id'
+  ec2InstanceType:
+    Type: String
+    Default: t2.medium
+    AllowedValues:
+    - t2.medium
+    - t3.medium
+  ASGname:
+    Type: String
+    Default: udagramASG
+  BucketName: 
+    Type: String
+    Default: myproject2022
+  bastionInstance:
+    Type: String
+    Default: t2.micro
+  bastionAMI: 
+    Type: String
+    Default: ami-0022f774911c1d690
+  udaKey:
+    Type: String
+    Default: test #filename of keypair
+
+# -----------------NETWORK-STACK-CONFIG---------------------------------#
+Resources: 
+  udagramVPC:
+    Type: AWS::EC2::VPC
+    Properties: 
+      CidrBlock: !Ref vpcCidr
+  udagramIG: 
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Project 
+        Value: Udagram
+  myvpcGWA:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref udagramIG
+      VpcId: !Ref udagramVPC
+
+# Public Subnet config      
+  pubSubnet1:
+    Type: AWS::EC2::Subnet 
+    Properties: 
+      CidrBlock: !Ref pubCidr1
+      VpcId: !Ref udagramVPC
+      AvailabilityZone: !Select [0, !GetAZs ''] 
+      MapPublicIpOnLaunch: True 
+  pubSubnet2:
+    Type: AWS::EC2::Subnet 
+    Properties: 
+      CidrBlock: !Ref pubCidr2
+      VpcId: !Ref udagramVPC
+      AvailabilityZone:  !Select [1, !GetAZs '']  
+      MapPublicIpOnLaunch: True 
+  Nat1EIP:  
+    Type: AWS::EC2::EIP 
+    DependsOn: myvpcGWA
+    Properties: 
+      Tags:
+      - Key: Description
+        Value: Public Nat1 IP
+  Nat2EIP:  
+    Type: AWS::EC2::EIP 
+    DependsOn: myvpcGWA
+    Properties: 
+      Tags:
+      - Key: Description
+        Value: Public Nat2 IP
+  pubNAT1:
+    Type: AWS::EC2::NatGateway
+    Properties:  
+      AllocationId: !GetAtt Nat1EIP.AllocationId
+      SubnetId: !Ref pubSubnet1
+  pubNAT2:
+    Type: AWS::EC2::NatGateway
+    Properties:  
+      AllocationId: !GetAtt Nat2EIP.AllocationId
+      SubnetId: !Ref pubSubnet2      
+  DefaultPubRoute:
+    Type: AWS::EC2::Route 
+    DependsOn: myvpcGWA
+    Properties: 
+      RouteTableId: !Ref DefaultPubRT
+      GatewayId: !GetAtt  udagramIG.InternetGatewayId
+      DestinationCidrBlock: "0.0.0.0/0"
+  DefaultPubRT:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref udagramVPC
+  pubSubRTA1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref DefaultPubRT
+      SubnetId: !Ref pubSubnet1 
+  pubSubRTA2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref DefaultPubRT
+      SubnetId: !Ref pubSubnet2
+  
+  # Private subnet config
+  privSubnet1:
+    Type: AWS::EC2::Subnet 
+    Properties: 
+      CidrBlock: !Ref privCidr1
+      VpcId: !Ref udagramVPC
+      AvailabilityZone:  !Select [0, !GetAZs ''] 
+  privSubnet2:
+    Type: AWS::EC2::Subnet 
+    Properties: 
+      CidrBlock: !Ref privCidr2
+      VpcId: !Ref udagramVPC
+      AvailabilityZone:  !Select [1, !GetAZs '']
+  privRT1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref udagramVPC
+  priRoute1:
+    Type: AWS::EC2::Route 
+    Properties:
+      RouteTableId: !Ref privRT1
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref pubNAT1
+  privSubRTA1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref privRT1
+      SubnetId: !Ref privSubnet1
+  privRT2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref udagramVPC
+  priRoute2:
+    Type: AWS::EC2::Route 
+    Properties:
+      RouteTableId: !Ref privRT2
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref pubNAT2
+  privSubRTA2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref privRT2
+      SubnetId: !Ref privSubnet2
+# -------------------INFRASTRUCTURES-STACK-CONFIG----------------------#
+  # Security Group for Private Subnet and everything needed by instances in Private Subnet
+  udagramSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: "Allows only inbound access on port 80"
+      GroupName: AutoScalingSG
+      VpcId: !Ref udagramVPC
+      SecurityGroupEgress: 
+      - IpProtocol: tcp
+        FromPort: 0
+        ToPort: 65535
+        CidrIp: 0.0.0.0/0
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        SourceSecurityGroupId: !Ref udagramLBSecurityGrp
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        SourceSecurityGroupId: !Ref bastionSG
+  udagramRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: "This role is assumed by the ec2 to access s3" 
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+        - Effect: "Allow"
+          Principal: 
+            Service:
+            - ec2.amazonaws.com
+          Action: 
+          - 'sts:AssumeRole'
+      ManagedPolicyArns: 
+      - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+  udagramProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: 
+      - !Ref udagramRole
+  udagramASConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties: 
+      AssociatePublicIpAddress: True 
+      IamInstanceProfile: !Ref udagramProfile
+      ImageId: !Ref udagramAMI
+      BlockDeviceMappings: 
+        - DeviceName: /dev/sda1
+          Ebs: 
+            VolumeSize: '15'
+            VolumeType: gp2
+      InstanceType: !Ref ec2InstanceType
+      SecurityGroups:
+      - !Ref udagramSG
+      UserData:
+        Fn::Base64: !Sub |
+         #!/bin/bash
+         sudo apt update -y
+         sudo apt install apache2 unzip -y 
+         sudo systemctl start apache2.service       
+         curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+         unzip awscliv2.zip 
+         sudo ./aws/install
+         cd /var/www/html  
+         aws s3 cp s3://udacity-demo-1/udacity.zip .
+         unzip -o udacity.zip
+         EC2_AVAIL_ZONE=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
+         echo "<h1>Hello World From $(hostname -f) in AZ $EC2_AVAIL_ZONE </h1>" >> index.html
+
+         
+        #  For quick test, replace lines 91-93 with this command <<echo "Your Cloud Formation Script Works!!" > index.html>>  
+         
+        
+  udagramASG: 
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties: 
+      Cooldown: "300"
+      DesiredCapacity: "3"
+      VPCZoneIdentifier:
+      - !Ref privSubnet1
+      - !Ref privSubnet2
+      LaunchConfigurationName: !Ref udagramASConfig
+      TargetGroupARNs: 
+      - !Ref LbTargetG
+      MaxSize: "4"
+      MinSize: "2"
+  udagramASGPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref udagramASG
+      PolicyType: SimpleScaling
+      AdjustmentType: ChangeInCapacity
+      ScalingAdjustment: 1
+# ---------------------------LOAD BALANCER------------------------------#
+# All resource config for load balancer to function
+  udagramLBSecurityGrp:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: "Allows only inbound access to load balancer"
+      GroupName: LoadBalancerSG
+      VpcId: !Ref udagramVPC
+      SecurityGroupIngress: 
+        IpProtocol: tcp 
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+         IpProtocol: tcp
+         FromPort: 80
+         ToPort: 80
+         CidrIp: 0.0.0.0/0
+  udagramLB: 
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties: 
+      SecurityGroups: 
+      - !Ref udagramLBSecurityGrp
+      Subnets:
+      - !Ref pubSubnet1
+      - !Ref pubSubnet2      
+  LbListeners:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions: 
+      - Type: forward
+        TargetGroupArn: !Ref LbTargetG 
+      LoadBalancerArn: !Ref udagramLB
+      Port: '80'
+      Protocol: HTTP
+  LbTargetG:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:   
+      HealthCheckEnabled: True 
+      HealthCheckIntervalSeconds: 20
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Port: "80"
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref udagramVPC 
+  LbListenersRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions: 
+      - Type: forward
+        TargetGroupArn: !Ref LbTargetG
+      Conditions:
+        - Field: path-pattern
+          Values: [/]
+      ListenerArn: !Ref LbListeners
+      Priority: 1
+# ---------------------------------BASTION HOST--------------------------------#
+  bastionSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: "Allows only ssh into bastion"
+      GroupName: bastionSG
+      VpcId: !Ref udagramVPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 0.0.0.0/0
+  bastionEIP:  
+    Type: AWS::EC2::EIP 
+    Properties: 
+      InstanceId: !Ref bastionHost
+      Tags:
+      - Key: type
+        Value: public
+  bastionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: "This role is assumed by the ec2 to access s3" 
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+        - Effect: "Allow"
+          Principal: 
+            Service:
+            - ec2.amazonaws.com
+          Action: 
+          - 'sts:AssumeRole'
+      ManagedPolicyArns: 
+      - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
+  bastionInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref bastionRole
+  bastionHost:    
+    Type: AWS::EC2::Instance
+    Properties: 
+     InstanceType: !Ref bastionInstance
+     ImageId: !Ref bastionAMI
+     NetworkInterfaces:
+     - AssociatePublicIpAddress: True
+       DeviceIndex: "0"
+       GroupSet: 
+       - !Ref bastionSG
+       SubnetId: !Ref pubSubnet1
+     KeyName: !Ref udaKey 
+     UserData:
+       !Base64 |
+        #!/bin/bash -ex
+        apt-get update -y
+        apt-get upgrade -y
+# ------------S3 BUCKET----------------#
+# Config for S3 bucket. This will create an s3 bucket for you. I didn't use it in my ASG.
+  # udagramBucket:
+  #   Type: "AWS::S3::Bucket"
+  #   Properties:
+  #     AccessControl: PublicRead
+  #     BucketName: !Ref BucketName
+  # udaBucketPolicy:
+  #   Type: "AWS::S3::BucketPolicy"
+  #   Properties:
+  #     Bucket: !Ref BucketName 
+  #     PolicyDocument: 
+  #       Version: "2012-10-17"
+  #       Statement: 
+  #        - Action: "S3:GetObject"
+  #          Effect: "Allow"
+  #          Principal: "*"
+  #          Resource: 
+  #           - !Join ["", ['arn:aws:s3:::', !Ref BucketName, /*]]
+    
+# -----------------------------------------OUTPUTS-----------------------------------------#
+Outputs:
+  URL:
+    Description: "The website's URL"
+    Value: !Join ["", ['http://', !GetAtt udagramLB.DNSName]] 
+    Export:
+      Name: !Sub ${Net}-Url
+  bastionIP: 
+    Description: "The bastion host EIP address"
+    Value: !Ref bastionEIP
+  VpcId: 
+    Description: The ID of myVPC
+    Value: !Ref udagramVPC
+  ElasticIP1:
+    Description: The Ip address of EIP1
+    Value: !Ref Nat1EIP 
+  ElasticIP2:
+    Description: The Ip address of EIP2
+    Value: !Ref Nat2EIP 
+  PrivSubnetId1:
+    Description: The Id of my private subnet1
+    Value: !Ref privSubnet1 
+  PrivSubnetId2:
+    Description: The Id of my private subnet2
+    Value: !Ref privSubnet2
+  PubSubnetId1:
+    Description: The Id of my public subnet1
+    Value: !Ref pubSubnet1
+  PubSubnetId2:
+    Description: The Id of my public subnet2
+    Value: !Ref pubSubnet2
+  
