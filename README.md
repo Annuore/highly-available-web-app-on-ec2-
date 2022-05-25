@@ -1,5 +1,5 @@
 # Deploy a Highly Available Webapp Using Cloudformation
-This code deploys a highly avalialble dummy web app to Apache Web Server running on ec2 instance using cloudformation template. Working on this project will give you he hands-on experience to work on cloudformation.
+This code deploys a highly avalialble dummy web app to Apache Web Server running on ec2 instance using cloudformation template. Working on this project will give you the hands-on experience to work on cloudformation.
 
 You will find starter code for the project in this [Github repository](https://github.com/udacity/nd9991-c2-Infrastructure-as-Code-v1)
 <br>
@@ -34,17 +34,17 @@ You have been tasked with provisioning the required infrastructure and deploying
 
 # Insight <a id='ins'></a>
 
-**Amazon EC2:**Amazon Elastic Compute Cloud (Amazon EC2) offers the broadest and deepest compute platform, with over 500 instances and choice of the latest processor, storage, networking, operating system, and purchase model to help you best match the needs of your workload. Use cases includes
+**Amazon EC2:** Amazon Elastic Compute Cloud (Amazon EC2) offers the broadest and deepest compute platform, with over 500 instances and choice of the latest processor, storage, networking, operating system, and purchase model to help you best match the needs of your workload. Use cases includes
 - Run cloud-native and enterprise apps
 - Scale for HPC apps
 - Develop for Apple platforms, etc.
 
-**AWS Cloudformation:**AWS CloudFormation is a service that helps you model and set up your AWS resources so that you can spend less time managing those resources and more time focusing on your applications that run in AWS. You create a template that describes all the AWS resources that you want (like Amazon EC2 instances or Amazon RDS DB instances), and CloudFormation takes care of provisioning and configuring those resources for you.
+**AWS Cloudformation:** AWS CloudFormation is a service that helps you model and set up your AWS resources so that you can spend less time managing those resources and more time focusing on your applications that run in AWS. You create a template that describes all the AWS resources that you want (like Amazon EC2 instances or Amazon RDS DB instances), and CloudFormation takes care of provisioning and configuring those resources for you.
 <br>
 
 # Project Requirements <a id='pr'></a>
 **Server Specs**
-- You'll need two vCPUs and at least 4GB of RAM, Ubuntu Opearing system (Ubuntu 18 or higher) and a launch configuration which will be used by the auto-scaling group. You need to allocate at least, 10GB of disk space. 
+- You'll need two vCPUs and at least 4GB of RAM, Ubuntu Operating system (Ubuntu 18 or higher) and a launch configuration which will be used by the auto-scaling group. You need to allocate at least, 10GB of disk space. 
 
 **Security Groups and Roles**
 - The default security group for the dummy app is `HTTP Port: 80`, therefore, your servers need this inbound port open since you'll use it with the **Load Balancer** and the **Load Balancer Health Check**. You'll need unrestricted internet access for your servers.
