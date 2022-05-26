@@ -1,22 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "This is a Webapp Project"
+Description: "This is a solution to all challenges in the IAC module in the udacity course"
 
 Parameters: 
-  vpcCidr:
-    Type: String 
-    Default: "10.0.0.0/16"
-  pubCidr1:
-    Type: String 
-    Default: "10.0.1.0/24"
-  pubCidr2:
-    Type: String 
-    Default: "10.0.2.0/24"
-  privCidr1:
-    Type: String 
-    Default: "10.0.3.0/24"
-  privCidr2:
-    Type: String 
-    Default: "10.0.4.0/24"
   Net:
     Description: Name for output exports
     Type: String 
@@ -43,138 +28,20 @@ Parameters:
   bastionAMI: 
     Type: String
     Default: ami-0022f774911c1d690
-  
+  udaKey:
+    Type: String
+    Default: test
 
-# -----------------NETWORK-STACK-CONFIG---------------------------------#
 Resources: 
-  udagramVPC:
-    Type: AWS::EC2::VPC
-    Properties: 
-      CidrBlock: !Ref vpcCidr
-  udagramIG: 
-    Type: AWS::EC2::InternetGateway
-    Properties:
-      Tags:
-      - Key: Project 
-        Value: Udagram
-  myvpcGWA:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      InternetGatewayId: !Ref udagramIG
-      VpcId: !Ref udagramVPC
-
-# Public Subnet config      
-  pubSubnet1:
-    Type: AWS::EC2::Subnet 
-    Properties: 
-      CidrBlock: !Ref pubCidr1
-      VpcId: !Ref udagramVPC
-      AvailabilityZone: !Select [0, !GetAZs ''] 
-      MapPublicIpOnLaunch: True 
-  pubSubnet2:
-    Type: AWS::EC2::Subnet 
-    Properties: 
-      CidrBlock: !Ref pubCidr2
-      VpcId: !Ref udagramVPC
-      AvailabilityZone:  !Select [1, !GetAZs '']  
-      MapPublicIpOnLaunch: True 
-  Nat1EIP:  
-    Type: AWS::EC2::EIP 
-    DependsOn: myvpcGWA
-    Properties: 
-      Tags:
-      - Key: Description
-        Value: Public Nat1 IP
-  Nat2EIP:  
-    Type: AWS::EC2::EIP 
-    DependsOn: myvpcGWA
-    Properties: 
-      Tags:
-      - Key: Description
-        Value: Public Nat2 IP
-  pubNAT1:
-    Type: AWS::EC2::NatGateway
-    Properties:  
-      AllocationId: !GetAtt Nat1EIP.AllocationId
-      SubnetId: !Ref pubSubnet1
-  pubNAT2:
-    Type: AWS::EC2::NatGateway
-    Properties:  
-      AllocationId: !GetAtt Nat2EIP.AllocationId
-      SubnetId: !Ref pubSubnet2      
-  DefaultPubRoute:
-    Type: AWS::EC2::Route 
-    DependsOn: myvpcGWA
-    Properties: 
-      RouteTableId: !Ref DefaultPubRT
-      GatewayId: !GetAtt  udagramIG.InternetGatewayId
-      DestinationCidrBlock: "0.0.0.0/0"
-  DefaultPubRT:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref udagramVPC
-  pubSubRTA1:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref DefaultPubRT
-      SubnetId: !Ref pubSubnet1 
-  pubSubRTA2:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref DefaultPubRT
-      SubnetId: !Ref pubSubnet2
-  
-  # Private subnet config
-  privSubnet1:
-    Type: AWS::EC2::Subnet 
-    Properties: 
-      CidrBlock: !Ref privCidr1
-      VpcId: !Ref udagramVPC
-      AvailabilityZone:  !Select [0, !GetAZs ''] 
-  privSubnet2:
-    Type: AWS::EC2::Subnet 
-    Properties: 
-      CidrBlock: !Ref privCidr2
-      VpcId: !Ref udagramVPC
-      AvailabilityZone:  !Select [1, !GetAZs '']
-  privRT1:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref udagramVPC
-  priRoute1:
-    Type: AWS::EC2::Route 
-    Properties:
-      RouteTableId: !Ref privRT1
-      DestinationCidrBlock: "0.0.0.0/0"
-      NatGatewayId: !Ref pubNAT1
-  privSubRTA1:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref privRT1
-      SubnetId: !Ref privSubnet1
-  privRT2:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref udagramVPC
-  priRoute2:
-    Type: AWS::EC2::Route 
-    Properties:
-      RouteTableId: !Ref privRT2
-      DestinationCidrBlock: "0.0.0.0/0"
-      NatGatewayId: !Ref pubNAT2
-  privSubRTA2:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref privRT2
-      SubnetId: !Ref privSubnet2
-# -------------------INFRASTRUCTURES-STACK-CONFIG----------------------#
-  # Security Group for Private Subnet and everything needed by instances in Private Subnet
+# Security Group for Private Subnet and everything needed by instances in Private Subnet
   udagramSG:
     Type: AWS::EC2::SecurityGroup
     Properties: 
       GroupDescription: "Allows only inbound access on port 80"
       GroupName: AutoScalingSG
-      VpcId: !Ref udagramVPC
+      VpcId: 
+        Fn::ImportValue:
+          !Sub ${Net}-VPCID
       SecurityGroupEgress: 
       - IpProtocol: tcp
         FromPort: 0
@@ -248,8 +115,10 @@ Resources:
       Cooldown: "300"
       DesiredCapacity: "3"
       VPCZoneIdentifier:
-      - !Ref privSubnet1
-      - !Ref privSubnet2
+      - Fn::ImportValue: 
+          !Sub "${Net}-privSubnet1" 
+      - Fn::ImportValue: 
+          !Sub "${Net}-privSubnet2"
       LaunchConfigurationName: !Ref udagramASConfig
       TargetGroupARNs: 
       - !Ref LbTargetG
@@ -269,7 +138,9 @@ Resources:
     Properties: 
       GroupDescription: "Allows only inbound access to load balancer"
       GroupName: LoadBalancerSG
-      VpcId: !Ref udagramVPC
+      VpcId: 
+        Fn::ImportValue:
+          !Sub ${Net}-VPCID
       SecurityGroupIngress: 
         IpProtocol: tcp 
         FromPort: 80
@@ -286,8 +157,10 @@ Resources:
       SecurityGroups: 
       - !Ref udagramLBSecurityGrp
       Subnets:
-      - !Ref pubSubnet1
-      - !Ref pubSubnet2      
+      - Fn::ImportValue: 
+          !Sub "${Net}-pubSubnet1" 
+      - Fn::ImportValue: 
+          !Sub "${Net}-pubSubnet2"      
   LbListeners:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -309,7 +182,9 @@ Resources:
       Port: "80"
       Protocol: HTTP
       UnhealthyThresholdCount: 2
-      VpcId: !Ref udagramVPC 
+      VpcId:  
+        Fn::ImportValue:
+          !Sub ${Net}-VPCID
   LbListenersRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
@@ -327,7 +202,9 @@ Resources:
     Properties: 
       GroupDescription: "Allows only ssh into bastion"
       GroupName: bastionSG
-      VpcId: !Ref udagramVPC
+      VpcId: 
+        Fn::ImportValue:
+          !Sub ${Net}-VPCID
       SecurityGroupIngress:
       - IpProtocol: tcp
         FromPort: 22
@@ -371,7 +248,10 @@ Resources:
        DeviceIndex: "0"
        GroupSet: 
        - !Ref bastionSG
-       SubnetId: !Ref pubSubnet1 
+       SubnetId: 
+        Fn::ImportValue: 
+         !Sub "${Net}-pubSubnet1"
+     KeyName: !Ref udaKey 
      UserData:
        !Base64 |
         #!/bin/bash -ex
@@ -407,25 +287,5 @@ Outputs:
   bastionIP: 
     Description: "The bastion host EIP address"
     Value: !Ref bastionEIP
-  VpcId: 
-    Description: The ID of myVPC
-    Value: !Ref udagramVPC
-  ElasticIP1:
-    Description: The Ip address of EIP1
-    Value: !Ref Nat1EIP 
-  ElasticIP2:
-    Description: The Ip address of EIP2
-    Value: !Ref Nat2EIP 
-  PrivSubnetId1:
-    Description: The Id of my private subnet1
-    Value: !Ref privSubnet1 
-  PrivSubnetId2:
-    Description: The Id of my private subnet2
-    Value: !Ref privSubnet2
-  PubSubnetId1:
-    Description: The Id of my public subnet1
-    Value: !Ref pubSubnet1
-  PubSubnetId2:
-    Description: The Id of my public subnet2
-    Value: !Ref pubSubnet2
-  
+      
+
