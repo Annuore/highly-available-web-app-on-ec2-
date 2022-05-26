@@ -4,45 +4,30 @@ Description: "This is a Webapp Project"
 Parameters: 
   vpcCidr:
     Type: String 
-    Default: "10.0.0.0/16"
   pubCidr1:
     Type: String 
-    Default: "10.0.1.0/24"
   pubCidr2:
     Type: String 
-    Default: "10.0.2.0/24"
   privCidr1:
     Type: String 
-    Default: "10.0.3.0/24"
   privCidr2:
     Type: String 
-    Default: "10.0.4.0/24"
   Net:
     Description: Name for output exports
     Type: String 
-    Default: UdacityProject
   udagramAMI:
     Description: AMI Id of Instance
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
-    Default: '/aws/service/canonical/ubuntu/server/22.04/stable/20220420/amd64/hvm/ebs-gp2/ami-id'
   ec2InstanceType:
     Type: String
-    Default: t2.medium
     AllowedValues:
     - t2.medium
     - t3.medium
   ASGname:
     Type: String
-    Default: udagramASG
   BucketName: 
     Type: String
-    Default: myproject2022
-  bastionInstance:
-    Type: String
-    Default: t2.micro
-  bastionAMI: 
-    Type: String
-    Default: ami-0022f774911c1d690
+
   
 
 # -----------------NETWORK-STACK-CONFIG---------------------------------#
@@ -364,8 +349,8 @@ Resources:
   bastionHost:    
     Type: AWS::EC2::Instance
     Properties: 
-     InstanceType: !Ref bastionInstance
-     ImageId: !Ref bastionAMI
+     InstanceType: t2.micro
+     ImageId:  ami-0022f774911c1d690
      NetworkInterfaces:
      - AssociatePublicIpAddress: True
        DeviceIndex: "0"

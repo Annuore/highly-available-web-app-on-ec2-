@@ -1,0 +1,42 @@
+[
+	{
+		"ParameterKey": "Net",
+		"ParameterValue": "UdacityProject"
+	},
+	{
+		"ParameterKey": "VpcCidr",
+		"ParameterValue": "10.0.0.0/16"
+	},
+	{
+		"ParameterKey": "pubCidr1",
+		"ParameterValue": "10.0.1.0/24"
+	},
+	{
+		"ParameterKey": "pubCidr2",
+		"ParameterValue": "10.0.2.0/24"
+	},
+	{
+		"ParameterKey": "privCidr1",
+		"ParameterValue": "10.0.3.0/24"
+	},
+	{
+		"ParameterKey": "privCidr2",
+		"ParameterValue": "10.0.4.0/24"
+	},
+    {
+		"ParameterKey": "udagramAMI",
+		"ParameterValue": "/aws/service/canonical/ubuntu/server/22.04/stable/20220420/amd64/hvm/ebs-gp2/ami-id"
+	},
+    {
+		"ParameterKey": "ec2InstanceType",
+		"ParameterValue": "t2.medium"
+	},
+    {
+		"ParameterKey": "ASGname",
+		"ParameterValue": "udagramASG"
+	},
+    {
+		"ParameterKey": "BucketName",
+		"ParameterValue": "myproject2022"
+	}
+]
